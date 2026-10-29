@@ -5,15 +5,19 @@ from pydantic import BaseModel, Field
 app = FastAPI(title="Machine Error Detection API")
 
 # 允許 Three.js 連接
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://codepen.io",
+        "https://cdpn.io",
         "http://localhost:5173",
         "http://127.0.0.1:5173"
     ],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"]
 )
+
 
 # 機台資料
 class MachineData(BaseModel):
