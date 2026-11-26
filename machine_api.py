@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
+from conveyor_ai import diagnose as diagnose_ai
 
 app = FastAPI(title="Smart Conveyor Fault Detection API")
 
@@ -79,6 +80,7 @@ def health():
 def diagnose(data: MachineData):
 
     codes = []
+    ai_result = None
 
     # 運轉中，或模擬器保留的故障快照
     should_check = data.running or data.fault_snapshot
@@ -109,6 +111,19 @@ def diagnose(data: MachineData):
         if data.roller_stuck is True:
             codes.append("E006")
 
+        # 呼叫 Random Forest AI V2
+        if (
+            data.belt_offset is not None
+            and data.belt_health is not None
+        ):
+            ai_result = diagnose_ai(
+                motor_current=data.current,
+                vibration=data.vibration,
+                rpm=data.rpm,
+                belt_offset=data.belt_offset,
+                belt_health=data.belt_health
+            )
+
     errors = [
         {"code": code, **ERROR_RULES[code]}
         for code in codes
@@ -122,9 +137,19 @@ def diagnose(data: MachineData):
 
     return {
         "machine_id": data.machine_id,
-        "status": "ERROR" if errors else "NORMAL",
+"status": "ERROR" if (
+    errors or (
+        ai_result is not None
+        and ai_result["fault_type"] != "Normal"
+    )
+) else "NORMAL",
         "error_count": len(errors),
         "errors": errors,
-        "ai_analysis": analysis,
-        "analysis_mode": "SIMULATION"
+                "ai_analysis": analysis,
+        "ai_result": ai_result,
+        "analysis_mode": (
+            "RULE_BASED_AND_RANDOM_FOREST_V2"
+            if ai_result is not None
+            else "RULE_BASED_ONLY"
+        )
     }
